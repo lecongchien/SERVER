@@ -22,6 +22,9 @@ import guestRoutes from '@/routes/guest.route'
 import orderRoutes from '@/routes/order.route'
 import { socketPlugin } from '@/plugins/socket.plugins'
 import indicatorRoutes from '@/routes/indicator.route'
+import userRoutes from '@/routes/user.route'
+import postRoutes from '@/routes/post.route'
+import messageRoutes from '@/routes/message.route'
 import autoRemoveRefreshTokenJob from '@/jobs/autoRemoveRefreshToken.job'
 
 const fastify = Fastify({
@@ -86,6 +89,18 @@ const start = async () => {
     fastify.register(indicatorRoutes, {
       prefix: '/indicators'
     })
+
+    // Đăng ký các route social app
+    fastify.register(userRoutes, {
+      prefix: '/api'
+    })
+    fastify.register(postRoutes, {
+      prefix: '/api'
+    })
+    fastify.register(messageRoutes, {
+      prefix: '/api'
+    })
+
     await initOwnerAccount()
     await fastify.listen({
       port: envConfig.PORT,

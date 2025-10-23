@@ -1,0 +1,245 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Social App Models
+model User {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  username    String    @unique
+  email       String    @unique
+  password    String
+  fullName    String
+  avatar      String?
+  bio         String?
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  posts       Post[]
+  likes       Like[]
+  comments    Comment[]
+  followers   Follow[]  @relation("UserFollowers")
+  following   Follow[]  @relation("UserFollowing")
+  sentMessages     Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+
+  @@map("users")
+}
+
+model Post {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  imageUrl  String?
+  authorId  String    @db.ObjectId
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     Like[]
+  comments  Comment[]
+
+  @@map("posts")
+}
+
+model Like {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  postId String @db.ObjectId
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  userId    String   @db.ObjectId
+  postId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Follow {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  followerId  String @db.ObjectId
+  followingId String @db.ObjectId
+
+  // Relations
+  follower    User   @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User   @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Message {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  content     String
+  messageType MessageType @default(TEXT)
+  senderId    String      @db.ObjectId
+  receiverId  String      @db.ObjectId
+  isRead      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User        @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+// Legacy Models (Restaurant Management)
+model Account {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String         @unique
+  password     String
+  avatar       String?
+  role         String         @default("Employee") // Owner, Employee
+  ownerId      String?        @db.ObjectId
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  orders       Order[]
+  employees    Account[]      @relation("OwnerEmployee")
+  owner        Account?       @relation("OwnerEmployee", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  refreshToken RefreshToken[]
+  sockets      Socket[]
+
+  @@map("accounts")
+}
+
+model Dish {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  price         Int
+  description   String
+  image         String
+  status        String         @default("Available")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  dishSnapshots DishSnapshot[]
+
+  @@map("dishes")
+}
+
+model DishSnapshot {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  price       Int
+  description String
+  image       String
+  status      String   @default("Available")
+  dishId      String?  @db.ObjectId
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  // Relations
+  dish        Dish?    @relation(fields: [dishId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  order       Order?
+
+  @@map("dish_snapshots")
+}
+
+model Table {
+  number    Int      @id
+  capacity  Int
+  status    String   @default("Available")
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders    Order[]
+  guests    Guest[]
+
+  @@map("tables")
+}
+
+model Order {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  guestId        String?       @db.ObjectId
+  tableNumber    Int?
+  dishSnapshotId String        @unique @db.ObjectId
+  quantity       Int
+  orderHandlerId String?       @db.ObjectId
+  status         String        @default("Pending")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  guest          Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  table          Table?        @relation(fields: [tableNumber], references: [number], onDelete: SetNull, onUpdate: NoAction)
+  dishSnapshot   DishSnapshot  @relation(fields: [dishSnapshotId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  orderHandler   Account?      @relation(fields: [orderHandlerId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@map("orders")
+}
+
+model Guest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  tableNumber Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  table       Table?   @relation(fields: [tableNumber], references: [number], onDelete: SetNull, onUpdate: NoAction)
+  orders      Order[]
+
+  @@map("guests")
+}
+
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  ownerId   String   @db.ObjectId
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  owner     Account  @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Socket {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  socketId  String  @unique
+  accountId String  @db.ObjectId
+
+  // Relations
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("sockets")
+}
